@@ -3,10 +3,10 @@
 Inspect BAM read support for known variant sites in BaseCode Processing Pipeline data, per sample.
 
 BaseCode GeneVar is a small, focused tool for BaseCode runs: you give it
-a BAM and a list of known variants, and it tells you — for every sample
-in the BAM — exactly how many reads support a variant at each position.
+a BAM and a list of known variants, and it tells you, for every sample
+in the BAM, exactly how many reads support a variant at each position.
 
-It is **not** a variant caller; it is a variant *inspector*
+It is not a variant caller; it is a variant inspector
 for sites you already care about (a returned ClinVar variant, a recurring
 hotspot, a cohort marker, a positive control, you name it).
 
@@ -100,11 +100,11 @@ BRCA1_c.68_69dupAG  17     43044295   AG    AGAG   ins   -
 CFTR_F508del        7      117559590  ATCT  A      del   +
 ```
 
-The `strand` column is the **gene's strand** on the reference (`+` or `−`).
+The `strand` column is the gene's strand on the reference (`+` or `−`).
 It is optional — variants without a strand still run, but the conversion
 check falls back to flagging both `G↔A` and `C↔T` for them.
 
-For **insertions**, `pos` is the **anchor base** (the base immediately
+For **insertions**, `pos` is the anchor base (the base immediately
 before the inserted sequence), `ref` is that anchor base, and `alt` is the
 anchor followed by the inserted bases — exactly as you would write it in
 a VCF.
