@@ -102,7 +102,7 @@ CFTR_F508del        7      117559590  ATCT  A      del   +
 
 The `strand` column is the gene's strand on the reference (`+` or `−`).
 It is optional — variants without a strand still run, but the conversion
-check falls back to flagging both `G↔A` and `C↔T` for them.
+check falls back to flagging both `G→A` and `C→T` for them.
 
 For **insertions**, `pos` is the anchor base (the base immediately
 before the inserted sequence), `ref` is that anchor base, and `alt` is the
