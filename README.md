@@ -1,6 +1,6 @@
 # BaseCode GeneVar
 
-Inspect BAM read support for known variant sites in BaseCode Processing Pipeline data, per sample.
+Inspect read support for known variant sites in RNA BaseCode data, per sample.
 
 BaseCode GeneVar is a small, focused tool for BaseCode runs: you give it
 a BAM and a list of known variants, and it tells you, for every sample
@@ -44,7 +44,7 @@ python genevar.py \
     -o calls.tsv
 ```
 
-The BAM must be coordinate-sorted and indexed (`samtools index sample.bam`).
+The BAM must be coordinate-sorted and indexed.
 
 ### Which BAM to use
 
@@ -56,8 +56,6 @@ From a BaseCode run, two BAMs are typically usable:
 - `*.reads.aligned.trimmed.genetagged.sorted.markdup.reconstructed.sorted.bam`
   — also works. Counts are per read, so depth is higher but PCR families
   contribute multiple times to the totals.
-
-Pick the stitched BAM unless you specifically want per-read counts.
 
 ### Options
 
@@ -106,8 +104,7 @@ check falls back to flagging both `G→A` and `C→T` for them.
 
 For **insertions**, `pos` is the anchor base (the base immediately
 before the inserted sequence), `ref` is that anchor base, and `alt` is the
-anchor followed by the inserted bases — exactly as you would write it in
-a VCF.
+anchor followed by the inserted bases.
 
 For **deletions**, `pos` is again the anchor base (immediately before the
 deleted bases), `ref` is the anchor followed by the deleted bases, and
@@ -129,3 +126,6 @@ One row per (variant, sample). Columns:
   (the three most common inserted sequences observed, for diagnostics).
 - For deletions: `del_any_count`, `del_other_count`, `top_deleted_lengths`
   (the three most common deletion lengths observed).
+
+  ---
+© 2026 Basic Genomics AB · All rights reserved
