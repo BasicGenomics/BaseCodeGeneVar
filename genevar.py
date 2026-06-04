@@ -4,7 +4,7 @@ from collections import defaultdict, Counter
 import pysam
 import pandas as pd
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 
 PLUS_STRAND_AMBIGUOUS  = frozenset({("G", "A")})
 MINUS_STRAND_AMBIGUOUS = frozenset({("C", "T")})
@@ -27,22 +27,24 @@ def is_conversion_ambiguous(vtype, ref, alt, strand=None):
     return False
 
 def parse_variants(path):
-    df = pd.read_csv(path, sep="\t", dtype={"chrom": str}, comment="#")
+    sep = "," if path.lower().endswith(".csv") else "\t"
+    df = pd.read_csv(path, sep=sep, dtype={"chrom": str}, comment="#")
     required = {"name", "chrom", "pos", "ref", "alt", "type"}
     missing = required - set(df.columns)
     if missing:
-        sys.exit(f"variants TSV missing columns: {sorted(missing)}")
+        kind = "CSV" if sep == "," else "TSV"
+        sys.exit(f"Variants {kind} missing columns: {sorted(missing)}")
     df["pos"] = df["pos"].astype(int)
     df["type"] = df["type"].str.lower()
     bad = df[~df["type"].isin({"snv", "ins", "del"})]
     if len(bad):
-        sys.exit(f"unsupported variant types: {bad['type'].unique().tolist()}")
+        sys.exit(f"Unsupported variant types: {bad['type'].unique().tolist()}")
     if "strand" not in df.columns:
         df["strand"] = ""
     df["strand"] = df["strand"].fillna("").astype(str).str.strip()
     bad_s = df[~df["strand"].isin({"", "+", "-"})]
     if len(bad_s):
-        sys.exit(f"unsupported strand values (use '+', '-', or leave blank): "
+        sys.exit(f"Unsupported strand values (use '+', '-', or leave blank): "
                  f"{bad_s['strand'].unique().tolist()}")
     return df
 
@@ -233,7 +235,8 @@ def main():
     )
     ap.add_argument("-i", "--bam", required=True, help="Input BAM.")
     ap.add_argument("-v", "--variants", required=True,
-                    help="Variants TSV with columns: name chrom pos ref alt type")
+                    help="Variants TSV/CSV with columns: "
+                         "name chrom pos ref alt type")
     ap.add_argument("-o", "--out", required=True,
                     help="Output TSV: per-(variant, sample) call counts.")
     ap.add_argument("--min-baseq", type=int, default=0,
@@ -265,7 +268,7 @@ def main():
             else:
                 rule = "strand unknown, flagging both G<->A and C<->T"
             print(
-                f"warning: variant {v['name']} ({v['chrom']}:{v['pos']} "
+                f"Warning: variant {v['name']} ({v['chrom']}:{v['pos']} "
                 f"{v['ref']}>{v['alt']}) is indistinguishable from BaseCode "
                 f"chemistry noise ({rule}). Alt-supporting reads may reflect "
                 f"a base modification rather than a true variant.",
@@ -297,7 +300,7 @@ def main():
             out_rows.append(r2)
 
     if not out_rows:
-        sys.exit("no reads found at any variant position")
+        sys.exit("No reads found at any variant position")
 
     df = pd.DataFrame(out_rows)
     leading = ["variant", "chrom", "pos", "ref", "alt", "type", "strand",
@@ -307,7 +310,7 @@ def main():
     rest = [c for c in df.columns if c not in leading]
     df = df[leading + rest].sort_values(["variant", "sample"])
     df.to_csv(args.out, sep="\t", index=False)
-    print(f"wrote {len(df)} rows to {args.out}", file=sys.stderr)
+    print(f"Wrote {len(df)} rows to {args.out}", file=sys.stderr)
 
 
 if __name__ == "__main__":
