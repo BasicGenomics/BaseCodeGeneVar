@@ -1,0 +1,10 @@
+# BaseCode GeneVar — example variants
+# REF/ALT are genomic-strand alleles (what would appear in a VCF), which
+# differ from the coding-strand alleles for genes on the minus strand.
+# strand is the gene's strand on the reference genome (+ or -). It controls
+# the BaseCode conversion-ambiguity check: + genes flag G>A, - genes flag C>T.
+#
+name,chrom,pos,ref,alt,type,strand
+BRAF_V600E,7,140753336,A,T,snv,-
+BRCA1_c.68_69dupAG,17,43044295,AG,AGAG,ins,-
+CFTR_F508del,7,117559590,ATCT,A,del,+

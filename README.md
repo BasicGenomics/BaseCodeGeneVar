@@ -1,5 +1,7 @@
 # BaseCode GeneVar
 
+[![Version](https://img.shields.io/badge/version-0.1.1-blue.svg)](VERSION)
+
 Inspect read support for known variant sites in RNA BaseCode data, per sample.
 
 BaseCode GeneVar is a small, focused tool for BaseCode runs: you give it
@@ -40,8 +42,8 @@ python genevar.py --help
 ```bash
 python genevar.py \
     -i sample.bam \
-    -v sample_variants.tsv \
-    -o calls.tsv
+    -v sample_variants.csv \
+    -o calls.csv
 ```
 
 The BAM must be coordinate-sorted and indexed.
@@ -62,15 +64,15 @@ From a BaseCode run, two BAMs are typically usable:
 | Flag           | Default | Description                                  |
 | -------------- | ------- | -------------------------------------------- |
 | `-i/--bam`     | —       | Input BAM.                         |
-| `-v/--variants`| —       | Variants TSV (see format below).             |
-| `-o/--out`     | —       | Output TSV.                                  |
+| `-v/--variants`| —       | Variants TSV/CSV. |
+| `-o/--out`     | —       | Output TSV/CSV. |
 | `--min-baseq`  | `0`     | Minimum base quality for SNV pileup.         |
 | `--min-mapq`   | `0`     | Minimum mapping quality.                     |
 | `--no-check-conversion` | (on by default) | Skip the BaseCode conversion-ambiguity check. |
 
 ### Conversion-aware mode (on by default)
 
-The flag is driven by the **`strand`** column in the variants TSV (the
+The flag is driven by the **`strand`** column in the variants TSV/CSV (the
 gene's strand on the reference, `+` or `−`):
 
 - `strand = +` → flag SNVs whose REF/ALT is `G→A`.
@@ -87,9 +89,9 @@ deamination event, so they are flagged only in the unusual case where
 the VCF anchor base on the REF side differs from the ALT side by one of
 the ambiguous swaps.
 
-## Variant TSV format
+## Variant TSV/CSV format
 
-Tab-separated, 1-based VCF-style coordinates.
+Tab- or comma-separated, 1-based VCF-style coordinates.
 
 ```
 name                chrom  pos        ref   alt    type  strand
@@ -110,13 +112,15 @@ For **deletions**, `pos` is again the anchor base (immediately before the
 deleted bases), `ref` is the anchor followed by the deleted bases, and
 `alt` is the anchor base alone.
 
-A ready-to-use example is provided in [`sample_variants.tsv`](sample_variants.tsv).
+Ready-to-use examples are provided in both formats:
+[`sample_variants.tsv`](sample_variants.tsv) and
+[`sample_variants.csv`](sample_variants.csv).
 
 ## Output
 
 One row per (variant, sample). Columns:
 
-- `variant, chrom, pos, ref, alt, type` — copied from the input TSV.
+- `variant, chrom, pos, ref, alt, type` — copied from the input TSV/CSV.
 - `sample` — value of the `SM` tag on the contributing reads.
 - `depth` — total reads counted at the site (deduplicated by read name).
 - `ref_count, alt_count` — reads supporting REF / ALT.

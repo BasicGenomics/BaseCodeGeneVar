@@ -10,6 +10,9 @@ PLUS_STRAND_AMBIGUOUS  = frozenset({("G", "A")})
 MINUS_STRAND_AMBIGUOUS = frozenset({("C", "T")})
 ANY_STRAND_AMBIGUOUS   = PLUS_STRAND_AMBIGUOUS | MINUS_STRAND_AMBIGUOUS
 
+def _sep_for_path(path):
+    return "," if path.lower().endswith(".csv") else "\t"
+
 def _ambiguous_set_for(strand):
     if strand == "+":
         return PLUS_STRAND_AMBIGUOUS
@@ -27,7 +30,7 @@ def is_conversion_ambiguous(vtype, ref, alt, strand=None):
     return False
 
 def parse_variants(path):
-    sep = "," if path.lower().endswith(".csv") else "\t"
+    sep = _sep_for_path(path)
     df = pd.read_csv(path, sep=sep, dtype={"chrom": str}, comment="#")
     required = {"name", "chrom", "pos", "ref", "alt", "type"}
     missing = required - set(df.columns)
@@ -238,7 +241,8 @@ def main():
                     help="Variants TSV/CSV with columns: "
                          "name chrom pos ref alt type")
     ap.add_argument("-o", "--out", required=True,
-                    help="Output TSV: per-(variant, sample) call counts.")
+                    help="Output per-(variant, sample) call counts. Written "
+                         "as TSV/CSV.")
     ap.add_argument("--min-baseq", type=int, default=0,
                     help="Minimum base quality for SNV pileup (default: 0).")
     ap.add_argument("--min-mapq", type=int, default=0,
@@ -309,7 +313,7 @@ def main():
     leading = [c for c in leading if c in df.columns]
     rest = [c for c in df.columns if c not in leading]
     df = df[leading + rest].sort_values(["variant", "sample"])
-    df.to_csv(args.out, sep="\t", index=False)
+    df.to_csv(args.out, sep=_sep_for_path(args.out), index=False)
     print(f"Wrote {len(df)} rows to {args.out}", file=sys.stderr)
 
 
