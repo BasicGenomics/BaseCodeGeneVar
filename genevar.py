@@ -4,7 +4,7 @@ from collections import defaultdict, Counter
 import pysam
 import pandas as pd
 
-__version__ = "0.1.1"
+__version__ = "0.1.2"
 
 PLUS_STRAND_AMBIGUOUS  = frozenset({("G", "A")})
 MINUS_STRAND_AMBIGUOUS = frozenset({("C", "T")})
@@ -51,38 +51,39 @@ def parse_variants(path):
                  f"{bad_s['strand'].unique().tolist()}")
     return df
 
-def call_snv(bam, chrom, pos1, ref, alt, min_baseq, min_mapq):
+def call_snv(bams, chrom, pos1, ref, alt, min_baseq, min_mapq, split_tag):
     counts = defaultdict(Counter)
     reads_seen = defaultdict(set)
     pos0 = pos1 - 1
-    for col in bam.pileup(
-        chrom, pos0, pos0 + 1,
-        truncate=True,
-        min_base_quality=min_baseq,
-        min_mapping_quality=min_mapq,
-        ignore_overlaps=False,
-        stepper="nofilter",
-    ):
-        if col.reference_pos != pos0:
-            continue
-        for pr in col.pileups:
-            read = pr.alignment
-            if read.is_secondary or read.is_supplementary or read.is_unmapped:
+    for bam in bams:
+        for col in bam.pileup(
+            chrom, pos0, pos0 + 1,
+            truncate=True,
+            min_base_quality=min_baseq,
+            min_mapping_quality=min_mapq,
+            ignore_overlaps=False,
+            stepper="nofilter",
+        ):
+            if col.reference_pos != pos0:
                 continue
-            try:
-                sm = read.get_tag("SM")
-            except KeyError:
-                sm = "NA"
-            if read.query_name in reads_seen[sm]:
-                continue
-            reads_seen[sm].add(read.query_name)
-            if pr.is_del:
-                counts[sm]["del"] += 1
-            elif pr.query_position is None:
-                counts[sm]["skip"] += 1
-            else:
-                base = read.query_sequence[pr.query_position].upper()
-                counts[sm][base] += 1
+            for pr in col.pileups:
+                read = pr.alignment
+                if read.is_secondary or read.is_supplementary or read.is_unmapped:
+                    continue
+                try:
+                    sm = read.get_tag(split_tag)
+                except KeyError:
+                    sm = "NA"
+                if read.query_name in reads_seen[sm]:
+                    continue
+                reads_seen[sm].add(read.query_name)
+                if pr.is_del:
+                    counts[sm]["del"] += 1
+                elif pr.query_position is None:
+                    counts[sm]["skip"] += 1
+                else:
+                    base = read.query_sequence[pr.query_position].upper()
+                    counts[sm][base] += 1
     rows = []
     for sm, c in counts.items():
         depth = sum(c.values())
@@ -101,7 +102,7 @@ def call_snv(bam, chrom, pos1, ref, alt, min_baseq, min_mapq):
         })
     return rows
 
-def call_insertion(bam, chrom, pos1, ref, alt, min_mapq):
+def call_insertion(bams, chrom, pos1, ref, alt, min_mapq, split_tag):
     expected_ins = alt[len(ref):].upper()
     pos0 = pos1 - 1
     per_sample = defaultdict(lambda: {
@@ -112,41 +113,42 @@ def call_insertion(bam, chrom, pos1, ref, alt, min_mapq):
         "ins_seqs": Counter(),
         "reads": set(),
     })
-    for read in bam.fetch(chrom, pos0, pos0 + 1):
-        if read.is_secondary or read.is_supplementary or read.is_unmapped:
-            continue
-        if read.mapping_quality < min_mapq:
-            continue
-        try:
-            sm = read.get_tag("SM")
-        except KeyError:
-            sm = "NA"
-        if read.query_name in per_sample[sm]["reads"]:
-            continue
-        per_sample[sm]["reads"].add(read.query_name)
+    for bam in bams:
+        for read in bam.fetch(chrom, pos0, pos0 + 1):
+            if read.is_secondary or read.is_supplementary or read.is_unmapped:
+                continue
+            if read.mapping_quality < min_mapq:
+                continue
+            try:
+                sm = read.get_tag("SM")
+            except KeyError:
+                sm = "NA"
+            if read.query_name in per_sample[sm]["reads"]:
+                continue
+            per_sample[sm]["reads"].add(read.query_name)
 
-        aligned = read.get_aligned_pairs(matches_only=False)
-        anchor_idx = None
-        for i, (qpos, rpos) in enumerate(aligned):
-            if rpos == pos0 and qpos is not None:
-                anchor_idx = i
-                break
-        if anchor_idx is None:
-            continue
-        per_sample[sm]["spanning"] += 1
-        ins_bases = []
-        for qpos, rpos in aligned[anchor_idx + 1:]:
-            if rpos is None and qpos is not None:
-                ins_bases.append(read.query_sequence[qpos].upper())
-            else:
-                break
-        if ins_bases:
-            ins_seq = "".join(ins_bases)
-            per_sample[sm]["ins_any"] += 1
-            per_sample[sm]["ins_lengths"][len(ins_seq)] += 1
-            per_sample[sm]["ins_seqs"][ins_seq] += 1
-            if ins_seq == expected_ins:
-                per_sample[sm]["ins_exact"] += 1
+            aligned = read.get_aligned_pairs(matches_only=False)
+            anchor_idx = None
+            for i, (qpos, rpos) in enumerate(aligned):
+                if rpos == pos0 and qpos is not None:
+                    anchor_idx = i
+                    break
+            if anchor_idx is None:
+                continue
+            per_sample[sm]["spanning"] += 1
+            ins_bases = []
+            for qpos, rpos in aligned[anchor_idx + 1:]:
+                if rpos is None and qpos is not None:
+                    ins_bases.append(read.query_sequence[qpos].upper())
+                else:
+                    break
+            if ins_bases:
+                ins_seq = "".join(ins_bases)
+                per_sample[sm]["ins_any"] += 1
+                per_sample[sm]["ins_lengths"][len(ins_seq)] += 1
+                per_sample[sm]["ins_seqs"][ins_seq] += 1
+                if ins_seq == expected_ins:
+                    per_sample[sm]["ins_exact"] += 1
     rows = []
     for sm, d in per_sample.items():
         depth = d["spanning"]
@@ -167,7 +169,7 @@ def call_insertion(bam, chrom, pos1, ref, alt, min_mapq):
         })
     return rows
 
-def call_deletion(bam, chrom, pos1, ref, alt, min_mapq):
+def call_deletion(bams, chrom, pos1, ref, alt, min_mapq, split_tag):
     expected_del_len = len(ref) - len(alt)
     pos0 = pos1 - 1
     per_sample = defaultdict(lambda: {
@@ -177,39 +179,40 @@ def call_deletion(bam, chrom, pos1, ref, alt, min_mapq):
         "del_lengths": Counter(),
         "reads": set(),
     })
-    for read in bam.fetch(chrom, pos0, pos0 + 1):
-        if read.is_secondary or read.is_supplementary or read.is_unmapped:
-            continue
-        if read.mapping_quality < min_mapq:
-            continue
-        try:
-            sm = read.get_tag("SM")
-        except KeyError:
-            sm = "NA"
-        if read.query_name in per_sample[sm]["reads"]:
-            continue
-        per_sample[sm]["reads"].add(read.query_name)
+    for bam in bams:
+        for read in bam.fetch(chrom, pos0, pos0 + 1):
+            if read.is_secondary or read.is_supplementary or read.is_unmapped:
+                continue
+            if read.mapping_quality < min_mapq:
+                continue
+            try:
+                sm = read.get_tag("SM")
+            except KeyError:
+                sm = "NA"
+            if read.query_name in per_sample[sm]["reads"]:
+                continue
+            per_sample[sm]["reads"].add(read.query_name)
 
-        aligned = read.get_aligned_pairs(matches_only=False)
-        anchor_idx = None
-        for i, (qpos, rpos) in enumerate(aligned):
-            if rpos == pos0 and qpos is not None:
-                anchor_idx = i
-                break
-        if anchor_idx is None:
-            continue
-        per_sample[sm]["spanning"] += 1
-        del_len = 0
-        for qpos, rpos in aligned[anchor_idx + 1:]:
-            if qpos is None and rpos is not None:
-                del_len += 1
-            else:
-                break
-        if del_len > 0:
-            per_sample[sm]["del_any"] += 1
-            per_sample[sm]["del_lengths"][del_len] += 1
-            if del_len == expected_del_len:
-                per_sample[sm]["del_exact"] += 1
+            aligned = read.get_aligned_pairs(matches_only=False)
+            anchor_idx = None
+            for i, (qpos, rpos) in enumerate(aligned):
+                if rpos == pos0 and qpos is not None:
+                    anchor_idx = i
+                    break
+            if anchor_idx is None:
+                continue
+            per_sample[sm]["spanning"] += 1
+            del_len = 0
+            for qpos, rpos in aligned[anchor_idx + 1:]:
+                if qpos is None and rpos is not None:
+                    del_len += 1
+                else:
+                    break
+            if del_len > 0:
+                per_sample[sm]["del_any"] += 1
+                per_sample[sm]["del_lengths"][del_len] += 1
+                if del_len == expected_del_len:
+                    per_sample[sm]["del_exact"] += 1
     rows = []
     for sm, d in per_sample.items():
         depth = d["spanning"]
@@ -234,15 +237,20 @@ def call_deletion(bam, chrom, pos1, ref, alt, min_mapq):
 def main():
     ap = argparse.ArgumentParser(
         prog="genevar",
-        description="BaseCode GeneVar — inspect BAM read support for known variant sites, per sample (split by SM tag).",
+        description="BaseCode GeneVar — inspect BAM read support for known variant sites, per sample (split by read tag, SM by default).",
     )
-    ap.add_argument("-i", "--bam", required=True, help="Input BAM.")
+    ap.add_argument("-b", "--bam", required=True, nargs="+", metavar="BAM",
+                    help="Input .bam file(s). Multiple may be listed; "
+                         "per-sample counts are merged across files.")
     ap.add_argument("-v", "--variants", required=True,
-                    help="Variants TSV/CSV with columns: "
+                    help="Variants .tsv/.csv file with columns: "
                          "name chrom pos ref alt type")
     ap.add_argument("-o", "--out", required=True,
                     help="Output per-(variant, sample) call counts. Written "
-                         "as TSV/CSV.")
+                         "as .tsv/.csv file")
+    ap.add_argument("--tag", default="SM", metavar="TAG",
+                    help="BAM tag to split samples on (default: SM). Reads "
+                         "lacking the tag are grouped as 'NA'.")
     ap.add_argument("--min-baseq", type=int, default=0,
                     help="Minimum base quality for SNV pileup (default: 0).")
     ap.add_argument("--min-mapq", type=int, default=0,
@@ -258,7 +266,7 @@ def main():
     args = ap.parse_args()
 
     variants = parse_variants(args.variants)
-    bam = pysam.AlignmentFile(args.bam, "rb")
+    bams = [pysam.AlignmentFile(path, "rb") for path in args.bam]
 
     out_rows = []
     for _, v in variants.iterrows():
@@ -280,18 +288,18 @@ def main():
             )
         if v["type"] == "snv":
             rows = call_snv(
-                bam, v["chrom"], int(v["pos"]), v["ref"], v["alt"],
-                args.min_baseq, args.min_mapq,
+                bams, v["chrom"], int(v["pos"]), v["ref"], v["alt"],
+                args.min_baseq, args.min_mapq, args.tag,
             )
         elif v["type"] == "ins":
             rows = call_insertion(
-                bam, v["chrom"], int(v["pos"]), v["ref"], v["alt"],
-                args.min_mapq,
+                bams, v["chrom"], int(v["pos"]), v["ref"], v["alt"],
+                args.min_mapq, args.tag,
             )
         else:
             rows = call_deletion(
-                bam, v["chrom"], int(v["pos"]), v["ref"], v["alt"],
-                args.min_mapq,
+                bams, v["chrom"], int(v["pos"]), v["ref"], v["alt"],
+                args.min_mapq, args.tag,
             )
         for r in rows:
             r2 = {"variant": v["name"],

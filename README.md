@@ -1,6 +1,6 @@
 # BaseCode GeneVar
 
-[![Version](https://img.shields.io/badge/version-0.1.1-blue.svg)](VERSION)
+[![Version](https://img.shields.io/badge/version-0.1.2-blue.svg)](VERSION)
 
 Inspect read support for known variant sites in RNA BaseCode data, per sample.
 
@@ -41,7 +41,7 @@ python genevar.py --help
 
 ```bash
 python genevar.py \
-    -i sample.bam \
+    -b sample.bam \
     -v sample_variants.csv \
     -o calls.csv
 ```
@@ -63,12 +63,13 @@ From a BaseCode run, two BAMs are typically usable:
 
 | Flag           | Default | Description                                  |
 | -------------- | ------- | -------------------------------------------- |
-| `-i/--bam`     | —       | Input BAM.                         |
+| `-b/--bam`     | —       | Input BAM file(s).                           |
 | `-v/--variants`| —       | Variants TSV/CSV. |
 | `-o/--out`     | —       | Output TSV/CSV. |
 | `--min-baseq`  | `0`     | Minimum base quality for SNV pileup.         |
 | `--min-mapq`   | `0`     | Minimum mapping quality.                     |
 | `--no-check-conversion` | (on by default) | Skip the BaseCode conversion-ambiguity check. |
+| `--tag`        | `SM`    | BAM tag to split samples on (default: SM). Reads lacking the tag are grouped as 'NA'. |
 
 ### Conversion-aware mode (on by default)
 
